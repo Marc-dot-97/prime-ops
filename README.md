@@ -13,9 +13,7 @@ Browser ──(signed in)──▶ /api/ops/tasks ──▶ ClickUp API v2   (to
 ```
 
 * The ClickUp token is only ever used on the server. The browser never sees it.
-* The server removes ticket IDs, links and people's names. People appear as **Member A, B, C…**. Names of anyone
-  assigned to a ticket (plus names in `OPS_REDACT_NAMES`) are also hidden inside ticket titles. This follows the
-  organisation rule.
+* Assignees show by the name they have in ClickUp (first name, or the full name if two people share one). ClickUp user IDs and emails are never sent to the browser. Each ticket has an **Open in ClickUp** link in its detail panel.
 * Results are cached for 60 seconds (keeps ClickUp rate limits safe). The page refreshes itself every 5 minutes and has a
   Refresh button. If ClickUp is briefly unreachable, the last good data stays on screen with a notice.
 * Staff sign in with their **Microsoft 365 work account** (the one linked to their staff email). The site never sees the password. Only people in the Optimum Microsoft tenant, on `OPS_ALLOWED_DOMAIN`, can enter.
@@ -59,7 +57,7 @@ Whichever you use, that ClickUp account must be able to see the Team Space.
 ## Tests
 
 `npm test` runs the real app against a fake ClickUp server (no token or database needed). It checks sign-in, paging,
-caching, token errors, and that no IDs, links or names reach the browser.
+caching, token errors, and that no ClickUp user IDs or emails reach the browser.
 
 ## Folder layout
 

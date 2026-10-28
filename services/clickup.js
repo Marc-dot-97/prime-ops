@@ -1,6 +1,6 @@
 // services/clickup.js: talks to the ClickUp REST API (v2) from the SERVER only.
-// The token never reaches the browser. Task IDs, URLs and people's names are also removed here, so the
-// browser only ever receives anonymous "Member A / Member B" labels (organisation rule).
+// The token never reaches the browser. ClickUp user IDs and emails are also stripped here: the browser only
+// receives each assignee's display name.
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -124,28 +124,24 @@ export function normaliseStatus(s) {
   return "in progress";
 }
 
-// People's names are not allowed on the dashboard, even inside task titles. We hide every name part of anyone
-// assigned to a ticket, plus any extra names listed in OPS_REDACT_NAMES (comma separated, e.g. "Robin,Clayton").
-function buildRedactor(rawTasks) {
-  const parts = new Set(
-    (process.env.OPS_REDACT_NAMES || "").split(",").map((x) => x.trim()).filter((x) => x.length >= 3)
-  );
-  for (const t of rawTasks)
-    for (const a of t.assignees || [])
-      for (const p of String(a.username || "").split(/\s+/)) if (p.length >= 3) parts.add(p);
-  if (!parts.size) return (text) => text;
-  const re = new RegExp(`\\b(${[...parts].map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "gi");
-  return (text) => text.replace(re, "[team member]");
-}
-
+// Shapes ClickUp's raw tasks for the browser. Assignees are shown by the name they have in ClickUp (first name,
+// or the full name when two people share a first name). ClickUp user IDs and emails are never sent.
 export function shape(rawTasks) {
-  const redact = buildRedactor(rawTasks);
-  const freq = new Map();
-  for (const t of rawTasks) for (const a of t.assignees || []) freq.set(a.id, (freq.get(a.id) || 0) + 1);
-  const order = new Map([...freq.entries()].sort((a, b) => b[1] - a[1]).map(([id], i) => [id, i]));
+  const people = new Map(); // ClickUp user id -> { username, count }
+  for (const t of rawTasks)
+    for (const a of t.assignees || []) {
+      const p = people.get(a.id) || { username: String(a.username || "Unknown").trim(), count: 0 };
+      p.count++;
+      people.set(a.id, p);
+    }
+  const ranked = [...people.entries()].sort((x, y) => y[1].count - x[1].count);
+  const firsts = ranked.map(([, p]) => p.username.split(/\s+/)[0]);
+  const names = ranked.map(([, p], i) => (firsts.filter((f) => f === firsts[i]).length > 1 ? p.username : firsts[i]));
+  const order = new Map(ranked.map(([id], i) => [id, i]));
   const num = (v) => (v ? Number(v) : 0);
+  const safeUrl = (u) => (typeof u === "string" && u.startsWith("https://app.clickup.com/") ? u : "");
   const tasks = rawTasks.map((t) => ({
-    name: redact(String(t.name ?? "")),
+    name: String(t.name ?? ""),
     st: normaliseStatus(t.status),
     pr: String(t.priority?.priority ?? t.priority ?? "none").toLowerCase(),
     as: (t.assignees || []).map((a) => order.get(a.id)),
@@ -153,8 +149,9 @@ export function shape(rawTasks) {
     upd: num(t.date_updated),
     cl: num(t.date_closed),
     list: LIST_SHORT[t.list?.name] || t.list?.name || "No list",
+    url: safeUrl(t.url),
   }));
-  return { tasks, members: order.size };
+  return { tasks, members: names };
 }
 
 // ---------- cache ----------

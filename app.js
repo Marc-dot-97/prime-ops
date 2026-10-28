@@ -64,8 +64,8 @@ export function createApp({ entra, tenantId, sessionSecret, isProduction = false
     return !emails.length; // nothing configured = anyone in the tenant
   };
   const ERRORS = {
-    failed: "Microsoft sign-in did not complete. Please try again.",
-    noaccess: "Your Microsoft account is not allowed to use this dashboard. Please contact IT Support.",
+    failed: "We could not complete your Microsoft sign-in. Please try again.",
+    noaccess: "This Microsoft account does not have access yet. Contact IT Support and we will help.",
   };
 
   app.get("/login", (req, res) => {
@@ -126,12 +126,12 @@ export function createApp({ entra, tenantId, sessionSecret, isProduction = false
           error: err.notConnected ? "not_connected" : "token_rejected",
           message: err.notConnected
             ? "ClickUp is not connected yet."
-            : "ClickUp rejected the saved access token. Please reconnect.",
+            : "ClickUp needs you to sign in again.",
           canConnect: oauthConfigured() && isAdmin(req),
         });
       }
       console.error("ClickUp feed failed:", err.message);
-      res.status(502).json({ error: "upstream", message: "ClickUp could not be reached. Please try again shortly." });
+      res.status(502).json({ error: "upstream", message: "We could not reach ClickUp. Please try again shortly." });
     }
   });
 
